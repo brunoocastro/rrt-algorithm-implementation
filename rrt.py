@@ -1,8 +1,9 @@
 import math
 import random
+import time
 from typing import List
-import pygame
 import numpy as np
+from matplotlib import pyplot as plt
 
 # Cores
 WHITE = (255, 255, 255)
@@ -13,64 +14,114 @@ RED = (255, 0, 0)
 
 
 class Map:
-    gameSprites = {"goal": None, "start": None, "nodes": [], "tiles": []}
+    def __init__(
+        self, start_pos, goal_pos, table_size=4, screen_size=400, obs_positions=[]
+    ) -> None:
+        self.table_size = table_size
+        self.state = np.zeros((self.table_size, self.table_size), dtype=int)
+        if len(obs_positions) > 0:
+            for obs in obs_positions:
+                self.state[obs[0], obs[1]] = 1
 
-    def __init__(self, size=4, screen_size=400) -> None:
-        self.size = size
-        self.state = np.zeros((self.size, self.size), dtype=int)
+        self.goal_pos = goal_pos
+        self.start_pos = start_pos
         self.screen_size = screen_size
 
-        # Inicialização do Pygame
-        # pygame.init()
-        # self.screen = pygame.display.set_mode((screen_size, screen_size))
-        # pygame.display.set_caption("Mapa do Jogo")
+        self.tile_size = screen_size // table_size
+
+        self.fig, self.ax = plt.subplots()
 
     def isFreePos(self, x, y):
         return self.state[x, y] == 0
 
-    def transformTileToMapPos(self, tileX, tileY):
-        cell_size = self.screen_size // self.size
-        x = math.ceil(tileX / cell_size)
-        y = math.ceil(tileY / cell_size)
-        print("Transf", x, y)
-        return (y - 1, x - 1)
+    def hasCollision(self, from_pos, to_pos):
+        """
+        Verifica se há obstáculos entre duas posições no mapa.
 
-    def render(self):
-        # print(self.state)
+        Args:
+            from_pos (tuple): Posição de origem (x, y).
+            to_pos (tuple): Posição de destino (x, y).
 
-        return self.state
-        # Desenha o mapa
-        cell_size = self.screen_size // self.size
-        for row in range(self.size):
-            for col in range(self.size):
-                tileBorder = pygame.Rect(
-                    col * cell_size, row * cell_size, cell_size, cell_size
+        Returns:
+            bool: True se há uma colisão (obstáculo) entre as posições, False caso contrário.
+        """
+        from_x, from_y = from_pos
+        to_x, to_y = to_pos
+        dx = abs(to_x - from_x)
+        dy = abs(to_y - from_y)
+        step_x = -0.01 if from_x > to_x else 0.01
+        step_y = -0.01 if from_y > to_y else 0.01
+        error = dx - dy
+
+        while True:
+            if not self.isFreePos(from_x, from_y):
+                return True  # Há um obstáculo entre as posições
+            if from_x == to_x and from_y == to_y:
+                break
+            error2 = 2 * error
+            if error2 > -dy:
+                error -= dy
+                from_x += step_x
+            if error2 < dx:
+                error += dx
+                from_y += step_y
+
+        return False  # Não há obstáculos entre as posições
+
+    def render(self, tree_nodes):
+        self.ax.clear()
+
+        # Renderizando o mapa com bordas
+        for i in range(self.table_size):
+            for j in range(self.table_size):
+                # Definindo cor do fundo
+                color = "white" if self.state[i, j] == 0 else "black"
+                # Adicionando retângulo com borda preta e centralizando o nó da árvore
+                rect = plt.Rectangle(
+                    (j, i),
+                    self.tile_size,
+                    self.tile_size,
+                    color=color,
+                    ec="black",
+                    lw=2,
                 )
-                list_of_nodes = [
-                    node for node in rrt.getNodes() if node.getPos() == (row, col)
-                ]
+                self.ax.add_patch(rect)
+                if (i, j) in tree_nodes:
+                    self.ax.plot(
+                        j + self.tile_size / 2,
+                        i + self.tile_size / 2,
+                        "ro",
+                        markersize=5,
+                    )  # Nó da árvore
 
-                self.gameSprites["tiles"].append(tileBorder)
-                pygame.draw.rect(self.screen, BLACK, tileBorder, 1)  # Adiciona borda
-                if (row, col) == startPoint:
-                    self.gameSprites["start"] = tileBorder
-                    pygame.draw.rect(self.screen, BLUE, tileBorder)
-                elif (row, col) == goalPoint:
-                    self.gameSprites["goal"] = tileBorder
-                    pygame.draw.rect(self.screen, GREEN, tileBorder)
-                elif not self.isFreePos(row, col):
-                    pygame.draw.rect(self.screen, BLACK, tileBorder)
-                elif len(list_of_nodes) > 0:
-                    print("Entrou", list_of_nodes)
-                    node_tile = pygame.draw.circle(
-                        self.screen,
-                        RED,
-                        [row + cell_size / 2, col + cell_size / 2],
-                        cell_size / 3,
-                    )
-                    self.gameSprites["nodes"].append(node_tile)
-                else:
-                    pygame.draw.rect(self.screen, WHITE, tileBorder)
+        # Renderizando o ponto de start
+        self.ax.plot(self.start_pos[1], self.start_pos[0], "bo", markersize=10)
+
+        # Renderizando o ponto de chegada
+        self.ax.plot(self.goal_pos[1], self.goal_pos[0], "go", markersize=10)
+
+        # Ligando os nós com linhas vermelhas
+        for node in tree_nodes:
+            if node.parent is not None:
+                parent_pos = node.parent.getPos()
+                print("parent pos", parent_pos)
+                self.ax.plot(
+                    [
+                        node.y + (self.tile_size / 2),
+                        parent_pos[1] + (self.tile_size / 2),
+                    ],
+                    [
+                        node.x + (self.tile_size / 2),
+                        parent_pos[0] + (self.tile_size / 2),
+                    ],
+                    "r-",
+                )
+
+        plt.xlim(0, self.table_size)
+        plt.ylim(0, self.table_size)
+        plt.gca().set_aspect("equal", adjustable="box")
+        plt.pause(0.01)
+        plt.draw()
 
 
 class TreeNode:
@@ -95,88 +146,108 @@ class RRTAlgorithm:
     _nodeList: List[TreeNode] = []
     reachedGoal = False
     goalRange = 2
+    reachDistance = 1
 
-    def __init__(self, map: Map, start, goal) -> None:
+    def __init__(self, map: Map) -> None:
         self.map = map
-        self.startPoint = start
-        self.goalPoint = goal
 
     def addNode(self, x, y):
         isFree = self.map.isFreePos(x - 1, y - 1)
 
         if not isFree:
-            print(f"Posição ({x},{y}) não está livre!")
-            return
+            raise Exception(f"Posição ({x}, {y}) não está livre!")
 
-        parent = self._nodeList[-1] if len(self._nodeList) > 0 else None
+        nearestNode = self.findNearestNode(x, y)
 
-        newNode = TreeNode(x, y, parent)
+        if nearestNode is not None:
+            collided = self.map.hasCollision(nearestNode.getPos(), (x, y))
+
+            if collided:
+                raise Exception(f"Colisão entre {nearestNode.getPos()} e ({x}, {y})")
+
+        newNode = TreeNode(x, y, nearestNode)
+
         self._nodeList.append(newNode)
+
+        if (x, y) == map.goal_pos:
+            self.reachedGoal = True
 
     def getNodes(self):
         return self._nodeList
 
+    def getDistanceBetweenPoints(self, pos1, pos2):
+        x1, y1 = pos1
+        x2, y2 = pos2
+        return math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+        # return (x2 - x1) ** 2 + (y2 - y1) ** 2  # Retorna a distância ao quadrado (menor distância)
+        # return abs(x2 - x1) + abs(y2 - y1)  # Retorna a distância absoluta (maior distância)
+        # return max(abs(x2 - x1), abs(y2 - y1))  # Retorna a distância máxima (maior distância)
+        # return min(abs(x2 - x1), abs(y2 - y1))  # Retorna a distância mínima (menor distância)
+
+    def findNearestNode(self, x, y):
+        nearestNode = None
+        nearestDistance = math.inf
+
+        if len(self._nodeList) == 0:
+            return nearestNode, nearestDistance
+
+        for node in self._nodeList:
+            distance = self.getDistanceBetweenPoints((x, y), node.getPos())
+            if distance < nearestDistance:
+                nearestNode = node
+                nearestDistance = distance
+
+        return nearestNode
+
 
 # Configurações do mapa
+obstacles = [
+    (1, 1),
+    (3, 3),
+]
 screen_size = 400
-map = Map(6)
+amount_of_tiles = 10
 startPoint = (0, 0)
-goalPoint = (3, 3)
+goalPoint = (5, 5)
+map = Map(startPoint, goalPoint, 10, screen_size, obstacles)
 
 
 def getRandomPos():
-    randomX = random.randint(0, map.size - 1)
-    randomY = random.randint(0, map.size - 1)
+    randomX = random.randint(0, map.table_size - 1)
+    randomY = random.randint(0, map.table_size - 1)
 
     return (randomX, randomY)
 
 
-rrt = RRTAlgorithm(map, startPoint, goalPoint)
+rrt = RRTAlgorithm(map)
 
 # Loop principal
+iterations = 0
+blocked_iterations = 0
+blocked_positions = []
 running = True
 while running:
-    # for event in pygame.event.get():
-    #     if event.type == pygame.QUIT:
-    #         running = False
+    iterations += 1
 
-    # # Roda o algoritmo RRT
-    # try:
-    #     new_random_pos = getRandomPos()
-    #     print("Nova posição aleatória", new_random_pos)
-    #     rrt.addNode(*new_random_pos)
-    # except Exception as error:
-    #     print(error)
-
-    mapState = map.render()
     randomPos = getRandomPos()
-    rrt.addNode(*randomPos)
+
+    try:
+        rrt.addNode(*randomPos)
+
+        if rrt.reachedGoal:
+            running = False
+
+    except Exception as e:
+        blocked_iterations += 1
+        blocked_positions.append(randomPos)
+        print(f"Iteração ({iterations}) bloqueada  : {e}")
+
     currentNodes = rrt.getNodes()
 
-    nodesPos = [node.getPos() for node in currentNodes]
+    map.render(currentNodes)
+    time.sleep(0.5)
 
-    # Print pretty map with:
-    # 0 - Free
-    # 1 - Obstacle
-    # 2 - Start
-    # 3 - Goal
-    # 4 - Nodes
-    printMap = mapState
-    printMap[startPoint] = 2
-    printMap[goalPoint] = 3
-    printMap[nodesPos] = 4
-    print(printMap)
-
-    # pygame.display.flip()
-    # lastEvent = pygame.event.wait(0)
-    # print(lastEvent)
-
-    # if lastEvent.type == pygame.MOUSEBUTTONUP:
-    #     pos = pygame.mouse.get_pos()
-    #     clicked_sprites = [s for s in map.gameSprites["tiles"] if s.collidepoint(pos)]
-    #     print("Clicked", clicked_sprites, map.transformTileToMapPos(*pos))
-    #     rrt.addNode(*map.transformTileToMapPos(*pos))
-    #     print("Nodes", rrt.getNodes())
-
-
-pygame.quit()
+print("Chegou ao objetivo!")
+print(f"Nós da árvore ({len(currentNodes)}) : {currentNodes}")
+print(f"Iterações ({iterations}) : {currentNodes}")
+print(f"Iterações bloqueadas ({blocked_iterations}) : {blocked_positions}")
