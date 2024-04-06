@@ -13,23 +13,68 @@ GREEN = (0, 255, 0)
 RED = (255, 0, 0)
 
 
+class TreeNode:
+    def __init__(self, locationX, locationY, parent=None):
+        self.x = locationX
+        self.y = locationY
+        self.parent = parent
+        if self.parent is not None:
+            self.parent.addChild(self)
+        self.children = []
+
+        print("New Node", self.x, self.y, self.parent)
+
+    def getPos(self):
+        return (self.x, self.y)
+
+    def addChild(self, child):
+        self.children.append(child)
+
+
 class Map:
     def __init__(
-        self, start_pos, goal_pos, table_size=4, screen_size=400, obs_positions=[]
+        self, start_pos, goal_pos, table_size=100, goal_radius=2, obs_positions=[]
     ) -> None:
         self.table_size = table_size
-        self.state = np.zeros((self.table_size, self.table_size), dtype=int)
+        self.state = np.array(np.zeros((self.table_size, self.table_size), dtype=int))
         if len(obs_positions) > 0:
             for obs in obs_positions:
                 self.state[obs[0], obs[1]] = 1
 
-        self.goal_pos = goal_pos
-        self.start_pos = start_pos
-        self.screen_size = screen_size
+        self.goal = TreeNode(*goal_pos)
+        self.start = TreeNode(*start_pos)
+        self.goal_radius = goal_radius
 
-        self.tile_size = screen_size // table_size
+        print(self.state)
+        # Configurando mapa
+        self.figure = plt.figure("Map")
+        plt.imshow(self.state, cmap="binary")
 
-        self.fig, self.ax = plt.subplots()
+        self.ax = self.figure.gca()
+        plt.xlabel("Eixo X $(m)$")
+        plt.ylabel("Eixo Y $(m)$")
+
+        # Renderizando o ponto de start
+        plt.plot(
+            *self.start.getPos(),
+            "ro",
+            markersize=10,
+        )
+
+        # Renderizando o ponto de chegada
+        plt.plot(
+            *self.goal.getPos(),
+            "bo",
+            markersize=10,
+        )
+
+        # Renderizando região do GOAL
+        goalRegion = plt.Circle(
+            self.goal.getPos(), self.goal_radius, color="b", fill=False
+        )
+        self.ax.add_patch(goalRegion)
+
+        plt.show()
 
     def isFreePos(self, x, y):
         return self.state[x, y] == 0
@@ -68,43 +113,22 @@ class Map:
 
         return False  # Não há obstáculos entre as posições
 
-    def render(self, tree_nodes):
-        self.ax.clear()
+    def samplePos(self):
+        x = random.randint(0, self.state.shape[0])
+        y = random.randint(0, self.state.shape[1])
+        return np.array([x, y])
 
-        # Renderizando o mapa com bordas
-        for i in range(self.table_size):
-            for j in range(self.table_size):
-                # Definindo cor do fundo
-                color = "white" if self.state[i, j] == 0 else "black"
-                # Adicionando retângulo com borda preta e centralizando o nó da árvore
-                rect = plt.Rectangle(
-                    (j, i),
-                    self.tile_size,
-                    self.tile_size,
-                    color=color,
-                    ec="black",
-                    lw=2,
-                )
-                self.ax.add_patch(rect)
-                if (i, j) in tree_nodes:
-                    self.ax.plot(
-                        j + self.tile_size / 2,
-                        i + self.tile_size / 2,
-                        "ro",
-                        markersize=5,
-                    )  # Nó da árvore
-
-        # Renderizando o ponto de start
-        self.ax.plot(self.start_pos[1], self.start_pos[0], "bo", markersize=10)
-
-        # Renderizando o ponto de chegada
-        self.ax.plot(self.goal_pos[1], self.goal_pos[0], "go", markersize=10)
+    def render(self, tree_nodes: List[TreeNode]):
+        print("Redesenhando mapa")
+        # Desenhando nós da arvore
+        for node in tree_nodes:
+            plt.plot(*node.getPos(), "bo", markersize=5, fill=False)
 
         # Ligando os nós com linhas vermelhas
         for node in tree_nodes:
             if node.parent is not None:
+                print("parent")
                 parent_pos = node.parent.getPos()
-                print("parent pos", parent_pos)
                 self.ax.plot(
                     [
                         node.y + (self.tile_size / 2),
@@ -117,29 +141,11 @@ class Map:
                     "r-",
                 )
 
-        plt.xlim(0, self.table_size)
-        plt.ylim(0, self.table_size)
-        plt.gca().set_aspect("equal", adjustable="box")
-        plt.pause(0.01)
-        plt.draw()
-
-
-class TreeNode:
-    def __init__(self, x, y, parent=None):
-        self.x = x
-        self.y = y
-        self.parent = parent
-        if self.parent is not None:
-            self.parent.addChild(self)
-        self.children = []
-
-        print("New Node", self.x, self.y, self.parent)
-
-    def getPos(self):
-        return (self.x, self.y)
-
-    def addChild(self, child):
-        self.children.append(child)
+        # plt.xlim(0, self.table_size)
+        # plt.ylim(0, self.table_size)
+        # plt.gca().set_aspect("equal", adjustable="box")
+        # plt.pause(0.01)
+        # plt.draw()
 
 
 class RRTAlgorithm:
@@ -148,8 +154,12 @@ class RRTAlgorithm:
     goalRange = 2
     reachDistance = 1
 
-    def __init__(self, map: Map) -> None:
+    def __init__(self, map: Map, stepSize: int, numIterations: int) -> None:
         self.map = map
+        self.max_iterations = min(numIterations, map.table_size**2)
+        self.stepSize = stepSize
+        self.num_waypoints = 0
+        self.Waypoints = []
 
     def addNode(self, x, y):
         isFree = self.map.isFreePos(x - 1, y - 1)
@@ -169,7 +179,7 @@ class RRTAlgorithm:
 
         self._nodeList.append(newNode)
 
-        if (x, y) == map.goal_pos:
+        if (x, y) == map.goal:
             self.reachedGoal = True
 
     def getNodes(self):
@@ -199,27 +209,47 @@ class RRTAlgorithm:
 
         return nearestNode
 
+    def getUnitVector(self, start: tuple, end: tuple):
+        vector = np.array([*end]) - np.array([*start])
+        length = np.linalg.norm(vector)
+
+        return vector / length
+
+    def steerToPoint(self, startNode, endNode):
+        # Gera um vetor unitário que parte do start para o end
+        directionVector = self.getUnitVector(startNode.getPos(), endNode.getPos())
+        # Gera um offset do tamanho do passo na direção do vetor unitário
+        offsetVector = self.stepSize * directionVector
+
+        point = np.array([startNode.x + offsetVector[0], startNode.y + offsetVector[1]])
+
+        # Se o passo dado estiver fora do mapa, usa o limite do mapa
+        if point[0] >= self.state.shape[1]:
+            point[0] = self.state.shape[1]
+        if point[1] >= self.state.shape[0]:
+            point[1] = self.state.shape[0]
+
+        # Gerou um ponto dentro do mapa, a uma distancia "step_size" do
+        # ponto inicial na direção do vetor fornecido
+        return point
+
+    def tracePathToGoal(self, goal):
+        pass
+
 
 # Configurações do mapa
 obstacles = [
     (1, 1),
     (3, 3),
 ]
-screen_size = 400
+goalRadius = 3
 amount_of_tiles = 10
 startPoint = (0, 0)
-goalPoint = (5, 5)
-map = Map(startPoint, goalPoint, 10, screen_size, obstacles)
+goalPoint = (10, 10)
+map = Map(startPoint, goalPoint, 20, goalRadius, obstacles)
 
 
-def getRandomPos():
-    randomX = random.randint(0, map.table_size - 1)
-    randomY = random.randint(0, map.table_size - 1)
-
-    return (randomX, randomY)
-
-
-rrt = RRTAlgorithm(map)
+rrt = RRTAlgorithm(map, 2)
 
 # Loop principal
 iterations = 0
@@ -229,7 +259,7 @@ running = True
 while running:
     iterations += 1
 
-    randomPos = getRandomPos()
+    randomPos = map.samplePos()
 
     try:
         rrt.addNode(*randomPos)
