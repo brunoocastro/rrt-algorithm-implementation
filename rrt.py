@@ -3,6 +3,8 @@ import random
 import time
 from typing import List
 import numpy as np
+import matplotlib
+matplotlib.use('TkAgg')
 from matplotlib import pyplot as plt
 
 # Cores
@@ -74,8 +76,6 @@ class Map:
         )
         self.ax.add_patch(goalRegion)
 
-        plt.show()
-
     def isFreePos(self, x, y):
         return self.state[x, y] == 0
 
@@ -122,7 +122,7 @@ class Map:
         print("Redesenhando mapa")
         # Desenhando nós da arvore
         for node in tree_nodes:
-            plt.plot(*node.getPos(), "bo", markersize=5, fill=False)
+            plt.plot(*node.getPos(), "bo", markersize=5)
 
         # Ligando os nós com linhas vermelhas
         for node in tree_nodes:
@@ -131,21 +131,18 @@ class Map:
                 parent_pos = node.parent.getPos()
                 self.ax.plot(
                     [
-                        node.y + (self.tile_size / 2),
-                        parent_pos[1] + (self.tile_size / 2),
+                        node.y,
+                        parent_pos[1],
                     ],
                     [
-                        node.x + (self.tile_size / 2),
-                        parent_pos[0] + (self.tile_size / 2),
+                        node.x,
+                        parent_pos[0],
                     ],
                     "r-",
                 )
 
-        # plt.xlim(0, self.table_size)
-        # plt.ylim(0, self.table_size)
-        # plt.gca().set_aspect("equal", adjustable="box")
-        # plt.pause(0.01)
-        # plt.draw()
+        plt.draw()  # Redesenha o gráfico
+        plt.pause(0.01)  # Pausa a execução por um curto período de tempo para atualizar a janela
 
 
 class RRTAlgorithm:
@@ -162,18 +159,18 @@ class RRTAlgorithm:
         self.Waypoints = []
 
     def addNode(self, x, y):
-        isFree = self.map.isFreePos(x - 1, y - 1)
+        isFree = self.map.isFreePos(x, y)
 
         if not isFree:
             raise Exception(f"Posição ({x}, {y}) não está livre!")
 
         nearestNode = self.findNearestNode(x, y)
+        print("Nearest", nearestNode)
+        # if nearestNode is not None:
+        #     collided = self.map.hasCollision(nearestNode.getPos(), (x, y))
 
-        if nearestNode is not None:
-            collided = self.map.hasCollision(nearestNode.getPos(), (x, y))
-
-            if collided:
-                raise Exception(f"Colisão entre {nearestNode.getPos()} e ({x}, {y})")
+        #     if collided:
+        #         raise Exception(f"Colisão entre {nearestNode.getPos()} e ({x}, {y})")
 
         newNode = TreeNode(x, y, nearestNode)
 
@@ -199,7 +196,7 @@ class RRTAlgorithm:
         nearestDistance = math.inf
 
         if len(self._nodeList) == 0:
-            return nearestNode, nearestDistance
+            return nearestNode
 
         for node in self._nodeList:
             distance = self.getDistanceBetweenPoints((x, y), node.getPos())
@@ -249,7 +246,7 @@ goalPoint = (10, 10)
 map = Map(startPoint, goalPoint, 20, goalRadius, obstacles)
 
 
-rrt = RRTAlgorithm(map, 2)
+rrt = RRTAlgorithm(map, 2, 500)
 
 # Loop principal
 iterations = 0
@@ -262,6 +259,7 @@ while running:
     randomPos = map.samplePos()
 
     try:
+        print("POS", randomPos, map.state[randomPos[0], randomPos[1]])
         rrt.addNode(*randomPos)
 
         if rrt.reachedGoal:
@@ -276,6 +274,8 @@ while running:
 
     map.render(currentNodes)
     time.sleep(0.5)
+
+plt.show()
 
 print("Chegou ao objetivo!")
 print(f"Nós da árvore ({len(currentNodes)}) : {currentNodes}")
