@@ -4,7 +4,8 @@ import time
 from typing import List
 import numpy as np
 import matplotlib
-matplotlib.use('TkAgg')
+
+matplotlib.use("TkAgg")
 from matplotlib import pyplot as plt
 
 # Cores
@@ -34,6 +35,9 @@ class TreeNode:
 
 
 class Map:
+
+    drawnNodes = []
+
     def __init__(
         self, start_pos, goal_pos, table_size=100, goal_radius=2, obs_positions=[]
     ) -> None:
@@ -66,18 +70,20 @@ class Map:
         # Renderizando o ponto de chegada
         plt.plot(
             *self.goal.getPos(),
-            "bo",
+            "go",
             markersize=10,
         )
 
         # Renderizando região do GOAL
         goalRegion = plt.Circle(
-            self.goal.getPos(), self.goal_radius, color="b", fill=False
+            self.goal.getPos(), self.goal_radius, color="g", fill=False
         )
         self.ax.add_patch(goalRegion)
 
     def isFreePos(self, x, y):
-        return self.state[x, y] == 0
+        print("is Free", x, y, self.state.shape)
+
+        return self.state[int(x), int(y)] == 0
 
     def hasCollision(self, from_pos, to_pos):
         """
@@ -120,29 +126,33 @@ class Map:
 
     def render(self, tree_nodes: List[TreeNode]):
         print("Redesenhando mapa")
+
+        not_drawn_nodes = [node for node in tree_nodes if node not in self.drawnNodes]
+
         # Desenhando nós da arvore
-        for node in tree_nodes:
+        for node in not_drawn_nodes:
+            self.drawnNodes.append(node)
             plt.plot(*node.getPos(), "bo", markersize=5)
 
-        # Ligando os nós com linhas vermelhas
-        for node in tree_nodes:
+        # # Ligando os nós com linhas
+        for node in not_drawn_nodes:
             if node.parent is not None:
-                print("parent")
-                parent_pos = node.parent.getPos()
                 self.ax.plot(
                     [
-                        node.y,
-                        parent_pos[1],
+                        node.x,
+                        node.parent.x,
                     ],
                     [
-                        node.x,
-                        parent_pos[0],
+                        node.y,
+                        node.parent.y,
                     ],
-                    "r-",
+                    "b-",
                 )
 
         plt.draw()  # Redesenha o gráfico
-        plt.pause(0.01)  # Pausa a execução por um curto período de tempo para atualizar a janela
+        plt.pause(
+            0.01
+        )  # Pausa a execução por um curto período de tempo para atualizar a janela
 
 
 class RRTAlgorithm:
@@ -192,7 +202,7 @@ class RRTAlgorithm:
         # return min(abs(x2 - x1), abs(y2 - y1))  # Retorna a distância mínima (menor distância)
 
     def findNearestNode(self, x, y):
-        nearestNode = None
+        nearestNode = self.map.start
         nearestDistance = math.inf
 
         if len(self._nodeList) == 0:
@@ -204,27 +214,44 @@ class RRTAlgorithm:
                 nearestNode = node
                 nearestDistance = distance
 
+        print("Nearest Node", nearestNode, nearestDistance)
+
         return nearestNode
 
-    def getUnitVector(self, start: tuple, end: tuple):
+    def getUnitVector(self, start: tuple, end: tuple, drawGeneratedVector=False):
         vector = np.array([*end]) - np.array([*start])
         length = np.linalg.norm(vector)
 
+        if drawGeneratedVector:
+            plt.quiver(
+                *start,
+                *(vector / length),
+                angles="xy",
+                scale_units="xy",
+                scale=1,
+                color="r",
+                width=0.005,
+            )
+
         return vector / length
 
-    def steerToPoint(self, startNode, endNode):
+    def steerToPoint(self, refNode: TreeNode, newPosition: np.ndarray[(2, 1)]):
         # Gera um vetor unitário que parte do start para o end
-        directionVector = self.getUnitVector(startNode.getPos(), endNode.getPos())
+        directionVector = self.getUnitVector(
+            refNode.getPos(), (newPosition[0], newPosition[1]), True
+        )
         # Gera um offset do tamanho do passo na direção do vetor unitário
         offsetVector = self.stepSize * directionVector
 
-        point = np.array([startNode.x + offsetVector[0], startNode.y + offsetVector[1]])
+        point = np.array(
+            [np.ceil(refNode.x + offsetVector[0]), np.ceil(refNode.y + offsetVector[1])]
+        )
 
         # Se o passo dado estiver fora do mapa, usa o limite do mapa
-        if point[0] >= self.state.shape[1]:
-            point[0] = self.state.shape[1]
-        if point[1] >= self.state.shape[0]:
-            point[1] = self.state.shape[0]
+        if point[0] >= self.map.state.shape[1]:
+            point[0] = self.map.state.shape[1]
+        if point[1] >= self.map.state.shape[0]:
+            point[1] = self.map.state.shape[0]
 
         # Gerou um ponto dentro do mapa, a uma distancia "step_size" do
         # ponto inicial na direção do vetor fornecido
@@ -260,7 +287,11 @@ while running:
 
     try:
         print("POS", randomPos, map.state[randomPos[0], randomPos[1]])
-        rrt.addNode(*randomPos)
+        nearestNode = rrt.findNearestNode(randomPos[0], randomPos[1]) or map.start
+
+        newNode = rrt.steerToPoint(nearestNode, randomPos)
+        print("new node", newNode)
+        rrt.addNode(newNode[0], newNode[1])
 
         if rrt.reachedGoal:
             running = False
@@ -273,7 +304,7 @@ while running:
     currentNodes = rrt.getNodes()
 
     map.render(currentNodes)
-    time.sleep(0.5)
+    time.sleep(1)
 
 plt.show()
 
