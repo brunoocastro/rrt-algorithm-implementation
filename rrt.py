@@ -2,157 +2,10 @@ import math
 import random
 import time
 from typing import List
-import numpy as np
-import matplotlib
-
-matplotlib.use("TkAgg")
 from matplotlib import pyplot as plt
+import numpy as np
 
-# Cores
-WHITE = (255, 255, 255)
-BLUE = (0, 0, 255)
-BLACK = (0, 0, 0)
-GREEN = (0, 255, 0)
-RED = (255, 0, 0)
-
-
-class TreeNode:
-    def __init__(self, locationX, locationY, parent=None):
-        self.x = locationX
-        self.y = locationY
-        self.parent = parent
-        if self.parent is not None:
-            self.parent.addChild(self)
-        self.children = []
-
-        print("New Node", self.x, self.y, self.parent)
-
-    def getPos(self):
-        return (self.x, self.y)
-
-    def addChild(self, child):
-        self.children.append(child)
-
-
-class Map:
-
-    drawnNodes = []
-
-    def __init__(
-        self, start_pos, goal_pos, table_size=100, goal_radius=2, obs_positions=[]
-    ) -> None:
-        self.table_size = table_size
-        self.state = np.array(np.zeros((self.table_size, self.table_size), dtype=int))
-        if len(obs_positions) > 0:
-            for obs in obs_positions:
-                self.state[obs[0], obs[1]] = 1
-
-        self.goal = TreeNode(*goal_pos)
-        self.start = TreeNode(*start_pos)
-        self.goal_radius = goal_radius
-
-        print(self.state)
-        # Configurando mapa
-        self.figure = plt.figure("Map")
-        plt.imshow(self.state, cmap="binary")
-
-        self.ax = self.figure.gca()
-        plt.xlabel("Eixo X $(m)$")
-        plt.ylabel("Eixo Y $(m)$")
-
-        # Renderizando o ponto de start
-        plt.plot(
-            *self.start.getPos(),
-            "ro",
-            markersize=10,
-        )
-
-        # Renderizando o ponto de chegada
-        plt.plot(
-            *self.goal.getPos(),
-            "go",
-            markersize=10,
-        )
-
-        # Renderizando região do GOAL
-        goalRegion = plt.Circle(
-            self.goal.getPos(), self.goal_radius, color="g", fill=False
-        )
-        self.ax.add_patch(goalRegion)
-
-    def isFreePos(self, x, y):
-        print("is Free", x, y, self.state.shape)
-
-        return self.state[int(x), int(y)] == 0
-
-    def hasCollision(self, from_pos, to_pos):
-        """
-        Verifica se há obstáculos entre duas posições no mapa.
-
-        Args:
-            from_pos (tuple): Posição de origem (x, y).
-            to_pos (tuple): Posição de destino (x, y).
-
-        Returns:
-            bool: True se há uma colisão (obstáculo) entre as posições, False caso contrário.
-        """
-        from_x, from_y = from_pos
-        to_x, to_y = to_pos
-        dx = abs(to_x - from_x)
-        dy = abs(to_y - from_y)
-        step_x = -0.01 if from_x > to_x else 0.01
-        step_y = -0.01 if from_y > to_y else 0.01
-        error = dx - dy
-
-        while True:
-            if not self.isFreePos(from_x, from_y):
-                return True  # Há um obstáculo entre as posições
-            if from_x == to_x and from_y == to_y:
-                break
-            error2 = 2 * error
-            if error2 > -dy:
-                error -= dy
-                from_x += step_x
-            if error2 < dx:
-                error += dx
-                from_y += step_y
-
-        return False  # Não há obstáculos entre as posições
-
-    def samplePos(self):
-        x = random.randint(0, self.state.shape[0])
-        y = random.randint(0, self.state.shape[1])
-        return np.array([x, y])
-
-    def render(self, tree_nodes: List[TreeNode]):
-        print("Redesenhando mapa")
-
-        not_drawn_nodes = [node for node in tree_nodes if node not in self.drawnNodes]
-
-        # Desenhando nós da arvore
-        for node in not_drawn_nodes:
-            self.drawnNodes.append(node)
-            plt.plot(*node.getPos(), "bo", markersize=5)
-
-        # # Ligando os nós com linhas
-        for node in not_drawn_nodes:
-            if node.parent is not None:
-                self.ax.plot(
-                    [
-                        node.x,
-                        node.parent.x,
-                    ],
-                    [
-                        node.y,
-                        node.parent.y,
-                    ],
-                    "b-",
-                )
-
-        plt.draw()  # Redesenha o gráfico
-        plt.pause(
-            0.01
-        )  # Pausa a execução por um curto período de tempo para atualizar a janela
+from map import Helper, Map, TreeNode
 
 
 class RRTAlgorithm:
@@ -160,46 +13,107 @@ class RRTAlgorithm:
     reachedGoal = False
     goalRange = 2
     reachDistance = 1
+    finalPath: List[TreeNode] = []
 
     def __init__(self, map: Map, stepSize: int, numIterations: int) -> None:
         self.map = map
         self.max_iterations = min(numIterations, map.table_size**2)
-        self.stepSize = stepSize
+        self.maxStepSize = stepSize
         self.num_waypoints = 0
         self.Waypoints = []
 
-    def addNode(self, x, y):
+    def execute(self):
+        iterations = 0
+
+        while iterations < self.max_iterations:
+            blocked_iterations = 0
+            blocked_positions = []
+            running = True
+            startTime = time.time()
+
+            while running:
+                iterations += 1
+                print(f"Iteração {iterations}")
+
+                randomPos = map.samplePos()
+
+                try:
+                    nearestNode = (
+                        self.findNearestNode(randomPos[0], randomPos[1]) or map.start
+                    )
+
+                    newNodePosition = self.steerToPoint(nearestNode, randomPos)
+
+                    collided = map.hasCollision(nearestNode.getPos(), newNodePosition)
+                    if collided:
+                        raise Exception(
+                            f"Colisão entre {nearestNode.getPos()} e ({newNodePosition})"
+                        )
+
+                    self.addNode(newNodePosition[0], newNodePosition[1], nearestNode)
+
+                    if self.reachedGoal:
+                        running = False
+
+                except Exception as e:
+                    blocked_iterations += 1
+                    blocked_positions.append(randomPos)
+                    print(f"Iteração ({iterations}) bloqueada  : {e}")
+
+                currentNodes = self.getNodes()
+
+                map.render(currentNodes)
+
+            endTime = time.time()
+
+            self.tracePathToGoal(self.getNodes()[-1])
+
+            print(
+                f"Chegou ao objetivo! Tempo de execução: {endTime - startTime} segundos"
+            )
+            print(f"Tamanho da árvore: {len(currentNodes)}")
+            print(
+                f"Tamanho do caminho: {len(self.finalPath)} = {len(self.finalPath) * self.maxStepSize} meters"
+            )
+            print(
+                f"Iterações ({iterations}) x Iterações bloqueadas ({blocked_iterations})"
+            )
+
+            plt.show()
+
+        if not self.reachedGoal:
+            print(
+                f"Não foi possível encontrar o objetivo em {self.max_iterations} iterações!"
+            )
+
+    def checkFoundGoal(self, node: TreeNode):
+        distanceToGoal = self.map.getDistanceBetweenPoints(
+            node.getPos(), self.map.goal.getPos()
+        )
+        found = distanceToGoal <= self.map.goal_radius
+
+        if found:
+            print("Reached Goal!")
+            self.reachedGoal = True
+
+        return found
+
+    def addNode(self, x, y, parent=None):
         isFree = self.map.isFreePos(x, y)
 
         if not isFree:
             raise Exception(f"Posição ({x}, {y}) não está livre!")
 
-        nearestNode = self.findNearestNode(x, y)
-        print("Nearest", nearestNode)
-        # if nearestNode is not None:
-        #     collided = self.map.hasCollision(nearestNode.getPos(), (x, y))
+        newNode = TreeNode(x, y, parent)
 
-        #     if collided:
-        #         raise Exception(f"Colisão entre {nearestNode.getPos()} e ({x}, {y})")
-
-        newNode = TreeNode(x, y, nearestNode)
+        self.checkFoundGoal(newNode)
 
         self._nodeList.append(newNode)
 
-        if (x, y) == map.goal:
-            self.reachedGoal = True
+        return newNode
 
     def getNodes(self):
         return self._nodeList
-
-    def getDistanceBetweenPoints(self, pos1, pos2):
-        x1, y1 = pos1
-        x2, y2 = pos2
-        return math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
-        # return (x2 - x1) ** 2 + (y2 - y1) ** 2  # Retorna a distância ao quadrado (menor distância)
-        # return abs(x2 - x1) + abs(y2 - y1)  # Retorna a distância absoluta (maior distância)
-        # return max(abs(x2 - x1), abs(y2 - y1))  # Retorna a distância máxima (maior distância)
-        # return min(abs(x2 - x1), abs(y2 - y1))  # Retorna a distância mínima (menor distância)
 
     def findNearestNode(self, x, y):
         nearestNode = self.map.start
@@ -209,39 +123,22 @@ class RRTAlgorithm:
             return nearestNode
 
         for node in self._nodeList:
-            distance = self.getDistanceBetweenPoints((x, y), node.getPos())
+            distance = self.map.getDistanceBetweenPoints(
+                np.array([x, y]), node.getPos()
+            )
             if distance < nearestDistance:
                 nearestNode = node
                 nearestDistance = distance
 
-        print("Nearest Node", nearestNode, nearestDistance)
-
         return nearestNode
-
-    def getUnitVector(self, start: tuple, end: tuple, drawGeneratedVector=False):
-        vector = np.array([*end]) - np.array([*start])
-        length = np.linalg.norm(vector)
-
-        if drawGeneratedVector:
-            plt.quiver(
-                *start,
-                *(vector / length),
-                angles="xy",
-                scale_units="xy",
-                scale=1,
-                color="r",
-                width=0.005,
-            )
-
-        return vector / length
 
     def steerToPoint(self, refNode: TreeNode, newPosition: np.ndarray[(2, 1)]):
         # Gera um vetor unitário que parte do start para o end
-        directionVector = self.getUnitVector(
+        directionVector = Helper.getUnitVector(
             refNode.getPos(), (newPosition[0], newPosition[1]), True
         )
         # Gera um offset do tamanho do passo na direção do vetor unitário
-        offsetVector = self.stepSize * directionVector
+        offsetVector = self.maxStepSize * directionVector
 
         point = np.array(
             [np.ceil(refNode.x + offsetVector[0]), np.ceil(refNode.y + offsetVector[1])]
@@ -257,58 +154,65 @@ class RRTAlgorithm:
         # ponto inicial na direção do vetor fornecido
         return point
 
-    def tracePathToGoal(self, goal):
-        pass
+    def tracePathToGoal(self, goalNode):
+
+        if goalNode.parent is None:
+            print("Found Path")
+            print("Number of waypoints: ", len(self.finalPath))
+            print("Path size:", len(self.finalPath) * self.maxStepSize)
+
+            # Plot final path
+            for node in self.finalPath:
+                plt.plot(*node.getPos(), "o", markersize=10, color="green")
+                plt.plot(
+                    [
+                        node.x,
+                        node.parent.x,
+                    ],
+                    [
+                        node.y,
+                        node.parent.y,
+                    ],
+                    "-",
+                    linewidth=1,
+                    alpha=1,
+                    color="green",
+                )
+
+            return
+
+        self.finalPath.insert(0, goalNode)
+        self.tracePathToGoal(goalNode.parent)
 
 
 # Configurações do mapa
-obstacles = [
-    (1, 1),
-    (3, 3),
-]
-goalRadius = 3
-amount_of_tiles = 10
+
+tilesCount = 600
+precisionRadius = 20
 startPoint = (0, 0)
-goalPoint = (10, 10)
-map = Map(startPoint, goalPoint, 20, goalRadius, obstacles)
+goalPoint = (tilesCount - precisionRadius, tilesCount - precisionRadius)
+
+obstacles = []
+for i in range(int(tilesCount / 2)):
+    randomPos = (random.randint(0, tilesCount), random.randint(0, tilesCount))
+
+    # # If was at goal or nearest to start, skip
+    # if (
+    #     Helper.euclideanDistance(randomPos, goalPoint) < precisionRadius
+    #     or Helper.euclideanDistance(randomPos, startPoint) < precisionRadius
+    # ):
+    #     continue
+
+    obstacles.append(randomPos)
+
+map = Map(startPoint, goalPoint, tilesCount, precisionRadius, obstacles)
 
 
-rrt = RRTAlgorithm(map, 2, 500)
+maxIterations = 5000
+rrt = RRTAlgorithm(map, precisionRadius, maxIterations)
 
-# Loop principal
-iterations = 0
-blocked_iterations = 0
-blocked_positions = []
-running = True
-while running:
-    iterations += 1
+try:
+    rrt.execute()
 
-    randomPos = map.samplePos()
-
-    try:
-        print("POS", randomPos, map.state[randomPos[0], randomPos[1]])
-        nearestNode = rrt.findNearestNode(randomPos[0], randomPos[1]) or map.start
-
-        newNode = rrt.steerToPoint(nearestNode, randomPos)
-        print("new node", newNode)
-        rrt.addNode(newNode[0], newNode[1])
-
-        if rrt.reachedGoal:
-            running = False
-
-    except Exception as e:
-        blocked_iterations += 1
-        blocked_positions.append(randomPos)
-        print(f"Iteração ({iterations}) bloqueada  : {e}")
-
-    currentNodes = rrt.getNodes()
-
-    map.render(currentNodes)
-    time.sleep(1)
-
-plt.show()
-
-print("Chegou ao objetivo!")
-print(f"Nós da árvore ({len(currentNodes)}) : {currentNodes}")
-print(f"Iterações ({iterations}) : {currentNodes}")
-print(f"Iterações bloqueadas ({blocked_iterations}) : {blocked_positions}")
+except KeyboardInterrupt:
+    print("Loop encerrado pelo usuário.")
