@@ -1,4 +1,5 @@
 import random
+import time
 from typing import List, Type
 import matplotlib
 import numpy as np
@@ -21,7 +22,7 @@ class Helper:
                 scale_units="xy",
                 scale=1,
                 color="r",
-                width=0.005,
+                width=0.008,
             )
 
         return vector / length
@@ -57,19 +58,23 @@ class TreeNode:
 class Map:
 
     drawnNodes = []
+    figure = None
+    figureAxes = None
 
     def __init__(
         self,
         start_pos,
         goal_pos,
-        table_size: int = 100,
-        goal_radius: int = 2,
-        obs_positions: List[np.ndarray] = [],
+        tableShape: tuple = (100, 100),
+        goalRadius: int = 2,
+        obstacles: List[np.ndarray] = [],
+        showGUI=False,
     ) -> None:
-        self.table_size = table_size
-        self.state = np.array(np.zeros((self.table_size, self.table_size), dtype=int))
-        if len(obs_positions) > 0:
-            for obs in obs_positions:
+        self.mustRender = showGUI
+        self.tableShape = tableShape
+        self.state = np.array(np.zeros(self.tableShape), dtype=int)
+        if len(obstacles) > 0:
+            for obs in obstacles:
                 print(obs)
                 if obs[0] < 0 or obs[0] >= self.state.shape[0]:
                     continue
@@ -79,13 +84,62 @@ class Map:
 
         self.goal = TreeNode(*goal_pos)
         self.start = TreeNode(*start_pos)
-        self.goal_radius = goal_radius
+        self.goal_radius = goalRadius
 
+        if self.mustRender:
+            self.startMapGUI()
+
+    def isFreePos(self, x, y):
+        roundedPos = int(x), int(y)
+
+        if roundedPos[0] < 0 or roundedPos[0] >= self.state.shape[0]:
+            raise ValueError(f"X out of map bounds: ({roundedPos})")
+        if roundedPos[1] < 0 or roundedPos[1] >= self.state.shape[1]:
+            raise ValueError(f"Y out of map bounds: ({roundedPos})")
+
+        return self.state[roundedPos] == 0
+
+    def hasCollision(self, from_pos: np.ndarray, to_pos: np.ndarray):
+        # Gera um vetor unitário que parte do start para o end
+        directionVector = Helper.getUnitVector(from_pos, to_pos)
+
+        # Calcula o tamanho do vetor real
+        distance = np.ceil(self.getDistanceBetweenPoints(from_pos, to_pos))
+        for i in range(int(distance)):
+            # Calcula a posição atual do vetor
+            currentPos = from_pos + (directionVector * i)
+            isFree = self.isFreePos(*currentPos)
+            if self.mustRender:
+                plt.plot(*currentPos, "yo", markersize=1.5)
+
+            # Verifica se a posição atual do vetor é válida (sem colisão)
+            if not isFree:
+                return True
+
+        return False
+
+    def samplePos(self):
+        x = random.randint(0, self.state.shape[0] - 1)
+        y = random.randint(0, self.state.shape[1] - 1)
+        return np.array([x, y])
+
+    def getDistanceBetweenPoints(
+        self, pos1: np.ndarray, pos2: np.ndarray, type="euclidean"
+    ):
+
+        types = {
+            "euclidean": Helper.euclideanDistance,
+            "manhattan": Helper.manhattanDistance,
+        }
+
+        return types[type](pos1, pos2)
+
+    def startMapGUI(self):
         # Configurando mapa
         self.figure = plt.figure("Map")
         plt.imshow(self.state, cmap="binary")
 
-        self.ax = self.figure.gca()
+        self.figureAxes = self.figure.gca()
         plt.xlabel("Eixo X $(m)$")
         plt.ylabel("Eixo Y $(m)$")
 
@@ -105,56 +159,17 @@ class Map:
 
         # Renderizando região do GOAL
         goalRegion = plt.Circle(
-            self.goal.getPos(), self.goal_radius, color="g", fill=False
+            self.goal.getPos(),
+            self.goal_radius,
+            color="g",
+            fill=False,
         )
-        self.ax.add_patch(goalRegion)
-
-    def isFreePos(self, x, y):
-        roundedPos = int(np.round(x, decimals=1)), int(np.round(y, decimals=1))
-
-        if roundedPos[0] < 0 or roundedPos[0] >= self.state.shape[0]:
-            raise ValueError("X out of map bounds")
-        if roundedPos[1] < 0 or roundedPos[1] >= self.state.shape[1]:
-            raise ValueError("Y out of map bounds")
-
-        return self.state[roundedPos] == 0
-
-    def hasCollision(self, from_pos: np.ndarray, to_pos: np.ndarray, resolution=0.1):
-        # Gera um vetor unitário que parte do start para o end
-        directionVector = Helper.getUnitVector(from_pos, to_pos)
-
-        # Calcula o tamanho do vetor real
-        distance = np.ceil(self.getDistanceBetweenPoints(from_pos, to_pos))
-
-        for i in range(int(distance * (1 / resolution))):
-            # Calcula a posição atual do vetor
-            currentPos = from_pos + (directionVector * i * resolution)
-            plt.plot(*currentPos, "yo", markersize=1)
-            isFree = self.isFreePos(*currentPos)
-
-            # Verifica se a posição atual do vetor é válida (sem colisão)
-            if not isFree:
-                return True
-
-        return False
-
-    def samplePos(self):
-        x = random.randint(0, self.state.shape[0])
-        y = random.randint(0, self.state.shape[1])
-        return np.array([x, y])
-
-    def getDistanceBetweenPoints(
-        self, pos1: np.ndarray, pos2: np.ndarray, type="euclidean"
-    ):
-
-        types = {
-            "euclidean": Helper.euclideanDistance,
-            "manhattan": Helper.manhattanDistance,
-        }
-
-        return types[type](pos1, pos2)
+        self.figureAxes.add_patch(goalRegion)
 
     def render(self, tree_nodes: List[TreeNode]):
+        if not self.mustRender:
+            return
+
         not_drawn_nodes = [node for node in tree_nodes if node not in self.drawnNodes]
 
         # Desenhando nós da arvore
@@ -165,7 +180,7 @@ class Map:
         # # Ligando os nós com linhas
         for node in not_drawn_nodes:
             if node.parent is not None:
-                self.ax.plot(
+                self.figureAxes.plot(
                     [
                         node.x,
                         node.parent.x,
@@ -181,3 +196,59 @@ class Map:
         plt.pause(
             0.01
         )  # Pausa a execução por um curto período de tempo para atualizar a janela
+
+    def renderFinalPath(self, finalPath: List[TreeNode]):
+        if not self.mustRender:
+            return
+
+        for node in finalPath:
+            plt.plot(*node.getPos(), "o", markersize=10, color="green")
+            plt.plot(
+                [
+                    node.x,
+                    node.parent.x,
+                ],
+                [
+                    node.y,
+                    node.parent.y,
+                ],
+                "-",
+                linewidth=1,
+                alpha=1,
+                color="green",
+            )
+
+    def openGUI(self):
+        if not self.mustRender:
+            return
+
+        plt.show()
+
+    def saveMapFigure(self, allNodes, finalPath):
+        # Save current map state
+        mustRenderLastState = self.mustRender
+        figureLastState = self.figure
+        axLastState = self.figureAxes
+        drawnNodesLastState = self.drawnNodes
+
+        # Reset States
+        self.mustRender = True
+        self.figure = None
+        self.figureAxes = None
+        self.drawnNodes = []
+
+        # Redraw entire map
+        self.startMapGUI()
+        self.render(allNodes)
+        self.renderFinalPath(finalPath)
+
+        # Save figure
+        currentDateWithTime = f"{time.time()}"
+        print("Current date", currentDateWithTime)
+        plt.savefig(f"images/map-{currentDateWithTime}.png")
+
+        # Return previous state
+        self.mustRender = mustRenderLastState
+        self.figureAxes = axLastState
+        self.figure = figureLastState
+        self.drawnNodes = drawnNodesLastState

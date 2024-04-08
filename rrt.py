@@ -2,7 +2,6 @@ import math
 import random
 import time
 from typing import List
-from matplotlib import pyplot as plt
 import numpy as np
 
 from map import Helper, Map, TreeNode
@@ -15,31 +14,39 @@ class RRTAlgorithm:
     reachDistance = 1
     finalPath: List[TreeNode] = []
 
-    def __init__(self, map: Map, stepSize: int, numIterations: int) -> None:
+    def __init__(self, map: Map, stepSize: int, maxIterations: int) -> None:
         self.map = map
-        self.max_iterations = min(numIterations, map.table_size**2)
+        self._nodeList = [map.start]
+        self.maxIterations = maxIterations
         self.maxStepSize = stepSize
-        self.num_waypoints = 0
-        self.Waypoints = []
 
     def execute(self):
         iterations = 0
 
-        while iterations < self.max_iterations:
-            blocked_iterations = 0
-            blocked_positions = []
+        while iterations < self.maxIterations:
+            blockedIterations = 0
+            blockedPositions = []
             running = True
             startTime = time.time()
 
             while running:
                 iterations += 1
-                print(f"Iteração {iterations}")
+                if iterations % 100 == 0:
+                    print(f"Iteração {iterations}")
 
                 randomPos = map.samplePos()
 
+                if randomPos[1] > self.map.state.shape[0]:
+                    print("Y maior que X:", randomPos)
+
                 try:
+                    # nearestNode = (
+                    #     self.findNearestNode(randomPos[0], randomPos[1]) or map.start
+                    # )
+
                     nearestNode = (
-                        self.findNearestNode(randomPos[0], randomPos[1]) or map.start
+                        self.findNearestNodeFromMatrix(randomPos[0], randomPos[1])
+                        or map.start
                     )
 
                     newNodePosition = self.steerToPoint(nearestNode, randomPos)
@@ -56,8 +63,8 @@ class RRTAlgorithm:
                         running = False
 
                 except Exception as e:
-                    blocked_iterations += 1
-                    blocked_positions.append(randomPos)
+                    blockedIterations += 1
+                    blockedPositions.append(randomPos)
                     print(f"Iteração ({iterations}) bloqueada  : {e}")
 
                 currentNodes = self.getNodes()
@@ -76,14 +83,16 @@ class RRTAlgorithm:
                 f"Tamanho do caminho: {len(self.finalPath)} = {len(self.finalPath) * self.maxStepSize} meters"
             )
             print(
-                f"Iterações ({iterations}) x Iterações bloqueadas ({blocked_iterations})"
+                f"Iterações ({iterations}) x Iterações bloqueadas ({blockedIterations})"
             )
 
-            plt.show()
+            # self.map.openGUI()
+            self.map.saveMapFigure(self.getNodes(), self.finalPath)
+            break
 
         if not self.reachedGoal:
             print(
-                f"Não foi possível encontrar o objetivo em {self.max_iterations} iterações!"
+                f"Não foi possível encontrar o objetivo em {self.maxIterations} iterações!"
             )
 
     def checkFoundGoal(self, node: TreeNode):
@@ -132,6 +141,21 @@ class RRTAlgorithm:
 
         return nearestNode
 
+    def findNearestNodeFromMatrix(self, x, y):
+
+        nodesPosition = np.array([node.getPos() for node in self._nodeList])
+
+        # A vector with same shape of nodesPosition but with all values filled with (x,y)
+        points = np.full_like(nodesPosition, (x, y))
+
+        # The difference results in a matrix of distances
+        distances = np.linalg.norm(points - nodesPosition, axis=1)
+
+        # The index of the minimum distance
+        nearestNode = self._nodeList[np.argmin(distances)]
+
+        return nearestNode
+
     def steerToPoint(self, refNode: TreeNode, newPosition: np.ndarray[(2, 1)]):
         # Gera um vetor unitário que parte do start para o end
         directionVector = Helper.getUnitVector(
@@ -162,22 +186,7 @@ class RRTAlgorithm:
             print("Path size:", len(self.finalPath) * self.maxStepSize)
 
             # Plot final path
-            for node in self.finalPath:
-                plt.plot(*node.getPos(), "o", markersize=10, color="green")
-                plt.plot(
-                    [
-                        node.x,
-                        node.parent.x,
-                    ],
-                    [
-                        node.y,
-                        node.parent.y,
-                    ],
-                    "-",
-                    linewidth=1,
-                    alpha=1,
-                    color="green",
-                )
+            self.map.renderFinalPath(self.finalPath)
 
             return
 
@@ -187,28 +196,42 @@ class RRTAlgorithm:
 
 # Configurações do mapa
 
-tilesCount = 600
-precisionRadius = 20
+mapShape = (100, 100)
+precisionRadius = 15
 startPoint = (0, 0)
-goalPoint = (tilesCount - precisionRadius, tilesCount - precisionRadius)
+goalPoint = (mapShape[0] - precisionRadius, mapShape[1] - precisionRadius)
 
 obstacles = []
-for i in range(int(tilesCount / 2)):
-    randomPos = (random.randint(0, tilesCount), random.randint(0, tilesCount))
+# obstaclesCount =mapShape[0] / 5
+obstaclesCount = 0
+for i in range(int(obstaclesCount)):
+    print("obstacles", i)
+    # Gera uma posição aleatória
+    randomPos = (random.randint(0, mapShape[0] - 1), random.randint(0, mapShape[1] - 1))
 
-    # # If was at goal or nearest to start, skip
-    # if (
-    #     Helper.euclideanDistance(randomPos, goalPoint) < precisionRadius
-    #     or Helper.euclideanDistance(randomPos, startPoint) < precisionRadius
-    # ):
-    #     continue
+    # Append a rectangle
+    # Generate points to make a square with 10x10
+    square_side = int(precisionRadius / 2)
 
-    obstacles.append(randomPos)
+    print("randomPos", randomPos)
 
-map = Map(startPoint, goalPoint, tilesCount, precisionRadius, obstacles)
+    x_inicio = max(0, randomPos[0] - square_side)
+    x_fim = min(mapShape[0] - 1, randomPos[0] + square_side)
+    y_inicio = max(0, randomPos[1] - square_side)
+    y_fim = min(mapShape[1] - 1, randomPos[1] + square_side)
+
+    # Preencher quadrado com 1s
+    for k in range(x_inicio, x_fim + 1):
+        for j in range(y_inicio, y_fim + 1):
+            print((k, j))
+            obstacles.append((k, j))
+
+showGUI = True
+
+map = Map(startPoint, goalPoint, mapShape, precisionRadius, obstacles, showGUI)
 
 
-maxIterations = 5000
+maxIterations = 500
 rrt = RRTAlgorithm(map, precisionRadius, maxIterations)
 
 try:
