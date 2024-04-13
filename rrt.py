@@ -196,35 +196,31 @@ class RRTAlgorithm:
 
 # Configurações do mapa
 
-mapShape = (100, 100)
-precisionRadius = 15
+mapShape = (20, 20)
+precisionRadius = 3
 startPoint = (0, 0)
 goalPoint = (mapShape[0] - precisionRadius, mapShape[1] - precisionRadius)
 
 obstacles = []
 # obstaclesCount =mapShape[0] / 5
-obstaclesCount = 0
+obstaclesCount = 5
 for i in range(int(obstaclesCount)):
-    print("obstacles", i)
     # Gera uma posição aleatória
-    randomPos = (random.randint(0, mapShape[0] - 1), random.randint(0, mapShape[1] - 1))
+    randomPos = (random.randint(5, mapShape[0] - 1), random.randint(5, mapShape[1] - 1))
 
     # Append a rectangle
     # Generate points to make a square with 10x10
     square_side = int(precisionRadius / 2)
 
-    print("randomPos", randomPos)
-
-    x_inicio = max(0, randomPos[0] - square_side)
-    x_fim = min(mapShape[0] - 1, randomPos[0] + square_side)
-    y_inicio = max(0, randomPos[1] - square_side)
-    y_fim = min(mapShape[1] - 1, randomPos[1] + square_side)
+    start_x = max(0, randomPos[0] - square_side)
+    final_x = min(mapShape[0] - 1, randomPos[0] + square_side)
+    start_y = max(0, randomPos[1] - square_side)
+    final_y = min(mapShape[1] - 1, randomPos[1] + square_side)
 
     # Preencher quadrado com 1s
-    for k in range(x_inicio, x_fim + 1):
-        for j in range(y_inicio, y_fim + 1):
-            print((k, j))
-            obstacles.append((k, j))
+    for x_pos in range(start_x, final_x + 1):
+        for y_pos in range(start_y, final_y + 1):
+            obstacles.append((x_pos, y_pos))
 
 showGUI = True
 
@@ -236,6 +232,15 @@ rrt = RRTAlgorithm(map, precisionRadius, maxIterations)
 
 try:
     rrt.execute()
+    map.openGUI()
+
+    # pathPos = np.zeros(map.state.shape, dtype=int)
+    # for node in rrt.getNodes():
+    #     [x, y] = node.getPos()
+    #     print("pos", x, y, pathPos[x, y], map.state[x, y])
+    #     pathPos[x, y] += 5
+
+    # print("PathPos", pathPos)
 
 except KeyboardInterrupt:
     print("Loop encerrado pelo usuário.")

@@ -14,6 +14,12 @@ class Helper:
         vector = end - start
         length = np.linalg.norm(vector)
 
+        # Check if value is not Nan or invalid
+        unitVector = vector / length
+        if np.isnan(unitVector).any():
+            print("Deu nan o vetor", unitVector)
+            return np.array([0, 0])
+
         if drawGeneratedVector:
             plt.quiver(
                 *start,
@@ -82,6 +88,8 @@ class Map:
                     continue
                 self.state[obs[0], obs[1]] = 1
 
+        print(self.state)
+
         self.goal = TreeNode(*goal_pos)
         self.start = TreeNode(*start_pos)
         self.goal_radius = goalRadius
@@ -109,8 +117,12 @@ class Map:
             # Calcula a posição atual do vetor
             currentPos = from_pos + (directionVector * i)
             isFree = self.isFreePos(*currentPos)
+
             if self.mustRender:
-                plt.plot(*currentPos, "yo", markersize=1.5)
+                if not isFree:
+                    plt.plot(*currentPos, "ro", markersize=5)
+                else:
+                    plt.plot(*currentPos, "yo", markersize=2)
 
             # Verifica se a posição atual do vetor é válida (sem colisão)
             if not isFree:
