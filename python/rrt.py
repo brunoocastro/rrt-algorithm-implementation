@@ -99,7 +99,7 @@ class RRTAlgorithm:
         distanceToGoal = self.map.getDistanceBetweenPoints(
             node.getPos(), self.map.goal.getPos()
         )
-        found = distanceToGoal <= self.map.goal_radius
+        found = distanceToGoal <= self.map.goalRadius
 
         if found:
             print("Reached Goal!")
@@ -196,17 +196,20 @@ class RRTAlgorithm:
 
 # Configurações do mapa
 
-mapShape = (20, 20)
-precisionRadius = 3
+mapShape = (10, 10)
+precisionRadius = 2
 startPoint = (0, 0)
 goalPoint = (mapShape[0] - precisionRadius, mapShape[1] - precisionRadius)
 
 obstacles = []
 # obstaclesCount =mapShape[0] / 5
-obstaclesCount = 5
+obstaclesCount = 2
 for i in range(int(obstaclesCount)):
     # Gera uma posição aleatória
-    randomPos = (random.randint(5, mapShape[0] - 1), random.randint(5, mapShape[1] - 1))
+    randomPos = (
+        random.randint(precisionRadius, mapShape[0] - 1),
+        random.randint(precisionRadius, mapShape[1] - 1),
+    )
 
     # Append a rectangle
     # Generate points to make a square with 10x10
@@ -232,7 +235,7 @@ rrt = RRTAlgorithm(map, precisionRadius, maxIterations)
 
 try:
     rrt.execute()
-    map.openGUI()
+    # map.openGUI()
 
     # pathPos = np.zeros(map.state.shape, dtype=int)
     # for node in rrt.getNodes():

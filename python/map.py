@@ -67,10 +67,13 @@ class Map:
     figure = None
     figureAxes = None
 
+    goal = None
+    start = None
+
     def __init__(
         self,
-        start_pos,
-        goal_pos,
+        startPos: tuple = (0, 0),
+        goalPos: tuple = (97, 97),
         tableShape: tuple = (100, 100),
         goalRadius: int = 2,
         obstacles: List[np.ndarray] = [],
@@ -79,23 +82,46 @@ class Map:
         self.mustRender = showGUI
         self.tableShape = tableShape
         self.state = np.array(np.zeros(self.tableShape), dtype=int)
+
+        self.setObstacles(obstacles)
+
+        if goalPos is not None:
+            self.setGoal(goalPos)
+
+        if startPos is not None:
+            self.setStart(startPos)
+
+        self.goalRadius = goalRadius
+
+        if self.mustRender:
+            self.redrawBaseMap()
+
+    def setObstacles(self, obstacles: List[np.ndarray]):
+        self.obstacles = obstacles
+
         if len(obstacles) > 0:
             for obs in obstacles:
-                print(obs)
                 if obs[0] < 0 or obs[0] >= self.state.shape[0]:
                     continue
                 if obs[1] < 0 or obs[1] >= self.state.shape[1]:
                     continue
                 self.state[obs[0], obs[1]] = 1
 
-        print(self.state)
+        if self.mustRender:
+            self.redrawBaseMap()
 
+    def setGoal(self, goal_pos, goalRadius=2):
         self.goal = TreeNode(*goal_pos)
-        self.start = TreeNode(*start_pos)
-        self.goal_radius = goalRadius
+        self.goalRadius = goalRadius
 
         if self.mustRender:
-            self.startMapGUI()
+            self.redrawBaseMap()
+
+    def setStart(self, start_pos):
+        self.start = TreeNode(*start_pos)
+
+        if self.mustRender:
+            self.redrawBaseMap()
 
     def isFreePos(self, x, y):
         roundedPos = int(x), int(y)
@@ -108,23 +134,24 @@ class Map:
         return self.state[roundedPos] == 0
 
     def hasCollision(self, from_pos: np.ndarray, to_pos: np.ndarray):
-        # Gera um vetor unitário que parte do start para o end
-        directionVector = Helper.getUnitVector(from_pos, to_pos)
+        print(f"From {from_pos} to {to_pos}")
 
-        # Calcula o tamanho do vetor real
-        distance = np.ceil(self.getDistanceBetweenPoints(from_pos, to_pos))
-        for i in range(int(distance)):
-            # Calcula a posição atual do vetor
-            currentPos = from_pos + (directionVector * i)
-            isFree = self.isFreePos(*currentPos)
+        pos_between_points = [
+            (x, y)
+            for x in range(int(from_pos[0]), int(to_pos[0] + 1))
+            for y in range(int(from_pos[1]), int(to_pos[0] + 1))
+        ]
+
+        for pos in pos_between_points:
+            isFree = self.isFreePos(*pos)
+            print(f"Checking collision in {pos} = {isFree}")
 
             if self.mustRender:
                 if not isFree:
-                    plt.plot(*currentPos, "ro", markersize=5)
+                    plt.plot(*pos, "ro", markersize=8)
                 else:
-                    plt.plot(*currentPos, "yo", markersize=2)
+                    plt.plot(*pos, "yo", markersize=3)
 
-            # Verifica se a posição atual do vetor é válida (sem colisão)
             if not isFree:
                 return True
 
@@ -146,37 +173,89 @@ class Map:
 
         return types[type](pos1, pos2)
 
-    def startMapGUI(self):
+    def redrawBaseMap(self):
+        # Limpando mapa caso já exista
+        plt.clf()
+
+        mapAdjustGap = 0.5
+
         # Configurando mapa
         self.figure = plt.figure("Map")
-        plt.imshow(self.state, cmap="binary")
+
+        if self.goal is not None:
+            goalPos = self.goal.getPos()
+            goalRegionX = [
+                x
+                for x in range(
+                    goalPos[0] - self.goalRadius, goalPos[0] + self.goalRadius + 1
+                )
+            ]
+            goalRegionY = [
+                y
+                for y in range(
+                    goalPos[1] - self.goalRadius, goalPos[1] + self.goalRadius + 1
+                )
+            ]
+            goalRegionSet = [(x, y) for x in goalRegionX for y in goalRegionY]
+
+        for i in range(self.tableShape[0]):
+            for j in range(self.tableShape[1]):
+                alpha = 1
+                if self.state[i, j] == 1:
+                    cor = "black"
+                elif self.goal is not None and (i, j) in goalRegionSet:
+                    cor = "green"
+                    alpha = 0.5
+                else:
+                    cor = "white"
+
+                y = j - mapAdjustGap
+                x = i - mapAdjustGap
+                plt.fill(
+                    [y, y + 1, y + 1, y],
+                    [x, x, x + 1, x + 1],
+                    color=cor,
+                    alpha=alpha,
+                    edgecolor="black",
+                )
 
         self.figureAxes = self.figure.gca()
         plt.xlabel("Eixo X $(m)$")
         plt.ylabel("Eixo Y $(m)$")
 
-        # Renderizando o ponto de start
-        plt.plot(
-            *self.start.getPos(),
-            "ro",
-            markersize=10,
-        )
+        # Configurando limites dos eixos para centrar os pontos de início e fim nos quadrados
+        plt.xlim(0 - mapAdjustGap, self.tableShape[0] - mapAdjustGap)
+        plt.ylim(0 - mapAdjustGap, self.tableShape[1] - mapAdjustGap)
 
-        # Renderizando o ponto de chegada
-        plt.plot(
-            *self.goal.getPos(),
-            "go",
-            markersize=10,
-        )
+        # Definindo os ticks dos eixos x e y para mostrar apenas valores inteiros
+        plt.xticks(range(self.tableShape[0]))
+        plt.yticks(range(self.tableShape[1]))
 
-        # Renderizando região do GOAL
-        goalRegion = plt.Circle(
-            self.goal.getPos(),
-            self.goal_radius,
-            color="g",
-            fill=False,
-        )
-        self.figureAxes.add_patch(goalRegion)
+        if self.start is not None:
+            # Renderizando o ponto de start
+            plt.plot(
+                *self.start.getPos(),
+                "ro",
+                markersize=10,
+            )
+
+        if self.goal is not None:
+
+            # Renderizando o ponto de chegada
+            plt.plot(
+                *self.goal.getPos(),
+                "go",
+                markersize=10,
+            )
+
+            # Renderizando região do GOAL
+            goalRegion = plt.Circle(
+                self.goal.getPos(),
+                self.goalRadius + mapAdjustGap,
+                color="g",
+                fill=False,
+            )
+            self.figureAxes.add_patch(goalRegion)
 
     def render(self, tree_nodes: List[TreeNode]):
         if not self.mustRender:
@@ -236,31 +315,42 @@ class Map:
 
         plt.show()
 
-    def saveMapFigure(self, allNodes, finalPath):
-        # Save current map state
-        mustRenderLastState = self.mustRender
-        figureLastState = self.figure
-        axLastState = self.figureAxes
-        drawnNodesLastState = self.drawnNodes
+    def saveScreenshot(self, figPathWithName=f"images/map-{time.time()}"):
+        if not self.mustRender:
+            raise Exception(
+                "Screenshots requires a initialized GUI. Rerun with mustRender equals True"
+            )
 
-        # Reset States
-        self.mustRender = True
-        self.figure = None
-        self.figureAxes = None
-        self.drawnNodes = []
+        plt.savefig(f"{figPathWithName}.png")
 
-        # Redraw entire map
-        self.startMapGUI()
-        self.render(allNodes)
-        self.renderFinalPath(finalPath)
+    def saveMapFigure(self, allNodes, finalPath, cleanFig=False):
+        if not self.mustRender or cleanFig:
+
+            # Save current map state
+            mustRenderLastState = self.mustRender
+            figureLastState = self.figure
+            axLastState = self.figureAxes
+            drawnNodesLastState = self.drawnNodes
+
+            # Reset States
+            self.mustRender = True
+            self.figure = None
+            self.figureAxes = None
+            self.drawnNodes = []
+
+            # Redraw entire map
+            self.redrawBaseMap()
+            self.render(allNodes)
+            self.renderFinalPath(finalPath)
 
         # Save figure
         currentDateWithTime = f"{time.time()}"
         print("Current date", currentDateWithTime)
         plt.savefig(f"images/map-{currentDateWithTime}.png")
 
-        # Return previous state
-        self.mustRender = mustRenderLastState
-        self.figureAxes = axLastState
-        self.figure = figureLastState
-        self.drawnNodes = drawnNodesLastState
+        if not self.mustRender or cleanFig:
+            # Return previous state
+            self.mustRender = mustRenderLastState
+            self.figureAxes = axLastState
+            self.figure = figureLastState
+            self.drawnNodes = drawnNodesLastState
