@@ -4,6 +4,8 @@ from typing import List, Type
 import matplotlib
 import numpy as np
 from matplotlib import pyplot as plt
+import pandas as pd
+import numba
 
 matplotlib.use("TkAgg")
 
@@ -123,6 +125,7 @@ class Map:
         if self.mustRender:
             self.redrawBaseMap()
 
+    @numba.njit
     def isFreePos(self, x, y):
         roundedPos = int(x), int(y)
 
@@ -133,6 +136,7 @@ class Map:
 
         return self.state[roundedPos] == 0
 
+    @numba.njit
     def hasCollision(self, from_pos: np.ndarray, to_pos: np.ndarray):
         print(f"From {from_pos} to {to_pos}")
 
@@ -162,6 +166,7 @@ class Map:
         y = random.randint(0, self.state.shape[1] - 1)
         return np.array([x, y])
 
+    @numba.njit
     def getDistanceBetweenPoints(
         self, pos1: np.ndarray, pos2: np.ndarray, type="euclidean"
     ):
@@ -354,3 +359,10 @@ class Map:
             self.figureAxes = axLastState
             self.figure = figureLastState
             self.drawnNodes = drawnNodesLastState
+
+    def saveMapAsCSV(self, path):
+        df = pd.DataFrame(self.state)
+
+        print(df.shape, df.sample())
+
+        df.to_csv(path)

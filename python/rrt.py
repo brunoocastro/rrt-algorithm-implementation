@@ -3,6 +3,8 @@ import random
 import time
 from typing import List
 import numpy as np
+import pandas as pd
+import numba
 
 from map import Helper, Map, TreeNode
 
@@ -124,6 +126,7 @@ class RRTAlgorithm:
     def getNodes(self):
         return self._nodeList
 
+    @numba.njit
     def findNearestNode(self, x, y):
         nearestNode = self.map.start
         nearestDistance = math.inf
@@ -141,6 +144,7 @@ class RRTAlgorithm:
 
         return nearestNode
 
+    @numba.njit
     def findNearestNodeFromMatrix(self, x, y):
 
         nodesPosition = np.array([node.getPos() for node in self._nodeList])
@@ -156,6 +160,7 @@ class RRTAlgorithm:
 
         return nearestNode
 
+    @numba.njit
     def steerToPoint(self, refNode: TreeNode, newPosition: np.ndarray[(2, 1)]):
         # Gera um vetor unitário que parte do start para o end
         directionVector = Helper.getUnitVector(
@@ -178,6 +183,7 @@ class RRTAlgorithm:
         # ponto inicial na direção do vetor fornecido
         return point
 
+    @numba.njit
     def tracePathToGoal(self, goalNode):
 
         if goalNode.parent is None:
@@ -196,14 +202,14 @@ class RRTAlgorithm:
 
 # Configurações do mapa
 
-mapShape = (10, 10)
-precisionRadius = 2
-startPoint = (0, 0)
+mapShape = (4500, 3000)
+precisionRadius = 150
+startPoint = (100, 100)
 goalPoint = (mapShape[0] - precisionRadius, mapShape[1] - precisionRadius)
 
 obstacles = []
 # obstaclesCount =mapShape[0] / 5
-obstaclesCount = 2
+obstaclesCount = 5
 for i in range(int(obstaclesCount)):
     # Gera uma posição aleatória
     randomPos = (
@@ -227,8 +233,16 @@ for i in range(int(obstaclesCount)):
 
 showGUI = True
 
-map = Map(startPoint, goalPoint, mapShape, precisionRadius, obstacles, showGUI)
+map = Map(startPoint, goalPoint, mapShape, precisionRadius, [], showGUI)
 
+# Carregar os dados do arquivo CSV
+# file_path = 'grid/ssl-el-obstacles.csv'  # Substitua pelo caminho do seu arquivo
+# data = pd.read_csv(file_path, header=None)
+
+# Converter os dados para uma matriz numpy
+# obstacles_data = data.to_numpy()
+
+# map.setObstacles(obstacles_data)
 
 maxIterations = 500
 rrt = RRTAlgorithm(map, precisionRadius, maxIterations)

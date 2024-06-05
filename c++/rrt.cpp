@@ -6,9 +6,9 @@
 
 using namespace std;
 
-int WIDTH = 800;
-int HEIGHT = 600;
-const int RADIUS = 5;
+int WIDTH = 450;
+int HEIGHT = 300;
+const int RADIUS = 18;
 const double GOAL_SAMPLING_PROB = 0.05;
 const double INF = 1e18;
 
@@ -37,8 +37,8 @@ void defaultInput()
 	cout << "Which type of RRT would you like to watch? 1 for RRT, 2 for RRT*, 3 for Anytime RRT" << endl;
 	cin >> whichRRT;
 
-	WIDTH = 960;
-	HEIGHT = 540;
+	WIDTH = 4500;
+	HEIGHT = 3000;
 
 	start.x = 50;
 	start.y = 50;
@@ -76,40 +76,113 @@ void defaultInput()
 
 void getInput()
 {
-	cout << "NOTE:" << endl;
-	cout << "Height of screen: " << HEIGHT << " pixels.";
-	cout << " Width of screeen: " << WIDTH << " pixels." << endl;
-	cout << "Maximum distance by which algorithm jumps from one point to another: " << JUMP_SIZE << " units" << endl;
-	cout << "If you would like to change of any of these, please make modifications in code" << endl;
-	cout << "Please provide your inputs keeping this in mind. " << endl
-			 << endl;
 
-	cout << "Which type of RRT would you like to watch? 1 for RRT, 2 for RRT*, 3 for Anytime RRT" << endl;
-	cin >> whichRRT;
-	cout << "Input co-ordinates of starting and ending point respectively in this format X1 Y1 X2 Y2" << endl;
-	cin >> start.x >> start.y >> stop.x >> stop.y;
-	cout << "How many obstacles?" << endl;
-	cin >> obstacle_cnt;
+	// Sample data
+	vector<Robot> team = {
+			{1, -1499.075439453125, 3.5936850717455116e-11, 0.0},
+			{2, -1499.075439453125, -1120.0, -0.0},
+			{0, -2150.0, -1.0179537534713745, -0.00043125651427544653}};
 
-	obstacles.resize(obstacle_cnt);
-	int pnts = 0;
-	Point pnt;
-	vector<Point> poly;
+	vector<Robot> enemies = {
+			{0, 1497.6259765625, 1120.0, 3.1415927410125732},
+			{1, 1497.6259765625, 1.688455907207509e-12, -3.1415927410125732},
+			{2, 1497.6259765625, -1120.0, 3.1415927410125732}};
 
-	for (int i = 0; i < obstacle_cnt; i++)
+	Point ball = {-826.5055541992188, -1.11676025390625};
+	double fieldWidth = 4500.0;
+	double fieldHeight = 3000.0;
+	double goalWidth = 800.0;
+	int currentRobotID = 1;
+
+	whichRRT = 1;
+	obstacle_cnt = 5;
+
+	WIDTH = fieldWidth;
+	HEIGHT = fieldHeight;
+
+	int padding = 100;
+
+	Point start, stop;
+	start.x = padding;
+	start.y = padding;
+
+	stop.x = WIDTH - padding;
+	stop.y = HEIGHT - padding;
+
+	vector<Obstacle> obstacles;
+
+	// Calculate total number of obstacles (all robots except currentRobotID)
+	for (const auto &robot : team)
 	{
-		poly.clear();
-		cout << "How many points in " << i + 1 << "th polygon?" << endl;
-		cin >> pnts;
-		poly.resize(pnts);
-
-		cout << "Input co-ordinates of " << i + 1 << "th polygon in clockwise order" << endl;
-		for (int j = 0; j < pnts; j++)
+		if (robot.id != currentRobotID)
 		{
-			cin >> pnt.x >> pnt.y;
-			obstacles[i].addPoint(pnt);
+			obstacle_cnt++;
 		}
 	}
+	for (const auto &robot : enemies)
+	{
+		obstacle_cnt++;
+	}
+
+	obstacles.resize(obstacle_cnt);
+	int index = 0;
+
+	// Reescrevendo a função addRobotAsObstacle
+	auto addRobotAsObstacle = [&](const Robot &robot)
+	{
+		if (index >= obstacles.size())
+		{
+			cerr << "Index out of bounds while adding obstacles" << endl;
+			return;
+		}
+
+		// Limpar e redimensionar poly
+		vector<Point> poly;
+		poly.clear();
+		int pnts = 6; // Número de pontos para aproximar o círculo
+		poly.resize(pnts);
+
+		// Gerar a posição do robô no campo
+		Point parsedPosition = robot.getParsedPosition();
+
+		// Gerar os pontos do círculo
+		for (int j = 0; j < pnts; ++j)
+		{
+			double angle = j * 2 * M_PI / pnts; // Dividir o círculo em partes iguais
+			Point pnt;
+			pnt.x = int(parsedPosition.x + RADIUS * cos(angle));
+			pnt.y = int(parsedPosition.y + RADIUS * sin(angle));
+			obstacles[index].addPoint(pnt);
+		}
+
+		index++;
+	};
+
+	for (const auto &robot : team)
+	{
+		if (robot.id != currentRobotID)
+		{
+			cout << "Adding robot as obstacle" << endl;
+			addRobotAsObstacle(robot);
+		}
+	}
+
+	for (const auto &robot : enemies)
+	{
+		addRobotAsObstacle(robot);
+	}
+
+	// Debug output to verify obstacles
+	for (const auto &obs : obstacles)
+	{
+		cout << "Obstacle with points:" << endl;
+		for (const auto &pt : obs.points)
+		{
+			cout << "(" << pt.x << ", " << pt.y << ")" << endl;
+		}
+	}
+
+	cout << "Get Input FINISHED" << endl;
 }
 
 // Prepares SFML objects of starting, ending point and obstacles
@@ -125,15 +198,44 @@ void prepareInput()
 	startingPoint.setOrigin(RADIUS / 2, RADIUS / 2);
 	endingPoint.setOrigin(RADIUS / 2, RADIUS / 2);
 
-	// Prepare polygon of obstacles
+	cout << "default settings ok" << endl;
+
+	cout << "Amount of obstacles: " << obstacle_cnt << endl;
+
+	vector<sf::ConvexShape> polygons(obstacle_cnt); // Usando SFML para desenhar polígonos
+	cout << "Polygons vector created" << endl;
+
 	polygons.resize(obstacle_cnt);
+	cout << "Polygons resized" << endl;
+
 	for (int i = 0; i < obstacle_cnt; i++)
 	{
+		cout << "Obstacle " << i << " has " << obstacles[i].pointCnt << " points" << endl;
+		if (obstacles[i].pointCnt <= 0)
+		{
+			cerr << "Obstacle " << i << " has no points, skipping..." << endl;
+			continue;
+		}
 		polygons[i].setPointCount(obstacles[i].pointCnt);
 		polygons[i].setFillColor(sf::Color(89, 87, 98));
 		for (int j = 0; j < obstacles[i].pointCnt; j++)
+		{
+			cout << "Setting point " << j << " for obstacle " << i << " to (" << obstacles[i].points[j].x << ", " << obstacles[i].points[j].y << ")" << endl;
 			polygons[i].setPoint(j, sf::Vector2f(obstacles[i].points[j].x, obstacles[i].points[j].y));
+		}
 	}
+
+	// // Prepare polygon of obstacles
+	// polygons.resize(obstacle_cnt);
+	// cout << "Polygons resized" << endl;
+	// for (int i = 0; i < obstacle_cnt; i++)
+	// {
+	// 	cout << "Obstacle " << i << " has " << obstacles[i].pointCnt << " points" << endl;
+	// 	polygons[i].setPointCount(obstacles[i].pointCnt);
+	// 	polygons[i].setFillColor(sf::Color(89, 87, 98));
+	// 	for (int j = 0; j < obstacles[i].pointCnt; j++)
+	// 		polygons[i].setPoint(j, sf::Vector2f(obstacles[i].points[j].x, obstacles[i].points[j].y));
+	// }
 }
 
 void draw(sf::RenderWindow &window)
@@ -336,9 +438,10 @@ void RRT()
 
 int main()
 {
-	// getInput();
-	defaultInput();
+	// defaultInput();
+	getInput();
 	prepareInput();
+	cout << "Input pronto, partiu renderizar" << endl;
 	sf::RenderWindow window(sf::VideoMode(WIDTH, HEIGHT), "Basic Anytime RRT");
 
 	nodeCnt = 1;
