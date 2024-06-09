@@ -1,6 +1,6 @@
 # Requirements
 
-C++ 11+ and SFML (Simple and Fast Multimedia Library) is required to run the codes.
+C++ 11+ and SFML (Simple and Fast Multimedia Library) are required to run the codes.
 
 ## Installation of requirements
 
@@ -13,12 +13,11 @@ $ sudo apt-get install libsfml-dev
 ## How to Build
 
 ```bash
-g++ -std=c++11 -c geometry.h rrt.cpp
-g++ rrt.o -o sfml-app -lsfml-graphics -lsfml-window -lsfml-system
+make fb
 ```
 
 ## How to Run
 
 ```bash
-./sfml-app
+make run
 ```
