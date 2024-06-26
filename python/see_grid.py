@@ -2,7 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # Carregar os dados do arquivo CSV
-file_path = 'grid/ssl-el.csv'  # Substitua pelo caminho do seu arquivo
+file_path = 'grid/ssl-el-obstacles-config1.csv'  # Substitua pelo caminho do seu arquivo
 data = pd.read_csv(file_path, header=None)
 
 # Converter os dados para uma matriz numpy

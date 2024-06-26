@@ -28,32 +28,64 @@ vector<sf::ConvexShape> drawablePolygons;
 sf::CircleShape startingPoint, endingPoint;
 bool pathFound = 0;
 
-void getInput()
+Configuration getConfig1()
 {
-	// Sample data
-	// vector<Robot> team = {
-	// 		Robot(1, -1499.075439453125, 3.5936850717455116e-11, 0.0),
-	// 		Robot(2, -1499.075439453125, -1120.0, -0.0),
-	// 		Robot(0, -2150.0, -1.0179537534713745, -0.00043125651427544653)};
-
-	// vector<Robot> enemies = {
-	// 		Robot(0, 1497.6259765625, 1120.0, 3.1415927410125732),
-	// 		Robot(1, 1497.6259765625, 1.688455907207509e-12, -3.1415927410125732),
-	// 		Robot(2, 1497.6259765625, -1120.0, 3.1415927410125732)};
-
+	// ---------- Configuração 1 ------------
 	vector<Robot> team = {
-			Robot(1, -149, 3.5936850717455116e-11, 0.0),
-			Robot(2, -149, -112, -0.0),
-			Robot(0, -215, -1.0179537534713745, -0.00043125651427544653)};
+			Robot(0, -2050, 0, 0.0),
+			Robot(1, -1000, -750, 0.0),
+			Robot(2, -1000, 750, 0.0),
+	};
 
 	vector<Robot> enemies = {
-			Robot(0, 149, 112, 3.1415927410125732),
-			Robot(1, 149, 1.688455907207509e-12, -3.1415927410125732),
-			Robot(2, 149, -112, 3.1415927410125732)};
+			Robot(0, 2050, 0, 0.0),
+			Robot(1, 1000, 750, 0.0),
+			Robot(2, 1000, -750, 0.0),
+	};
 
-	// Point ball = {-826.5055541992188, -1.11676025390625};
-	// double goalWidth = 800.0;
-	int currentRobotID = 1;
+	return Configuration(team, enemies);
+}
+
+Configuration getConfig2()
+{
+	// ---------- Configuração 2 ------------
+	vector<Robot> team = {
+			Robot(0, -2000, 0, 0.0),
+			Robot(1, -1000, 750, 0.0),
+			Robot(2, 0, -750, 0.0),
+	};
+
+	vector<Robot> enemies = {
+			Robot(0, 2000, 0, 0.0),
+			Robot(1, 1250, 750, 0.0),
+			Robot(2, 1250, -750, 0.0),
+	};
+
+	return Configuration(team, enemies);
+}
+
+Configuration getConfig3()
+{
+	// ---------- Configuração 3 ------------
+	vector<Robot> team = {
+			Robot(0, -2000, 0, 0.0),
+			Robot(1, -1000, 0, 0.0),
+			Robot(2, 1000, 0, 0.0),
+	};
+
+	vector<Robot> enemies = {
+			Robot(0, 2000, 0, 0.0),
+			Robot(1, 1250, 750, 0.0),
+			Robot(2, 1250, -750, 0.0),
+	};
+
+	return Configuration(team, enemies);
+}
+
+void getInput()
+{
+	
+	int currentRobotID = 0;
 
 	fieldWidth = fieldWidth;
 	fieldHeight = fieldHeight;
@@ -68,7 +100,9 @@ void getInput()
 	stop.x = fieldWidth - pointsPadding;
 	stop.y = fieldHeight - pointsPadding;
 
-	for (const auto &robot : team)
+	Configuration currentConfig = getConfig1();
+
+	for (const auto &robot : currentConfig.team)
 	{
 		if (robot.id != currentRobotID)
 		{
@@ -79,7 +113,7 @@ void getInput()
 		}
 	}
 
-	for (const auto &robot : enemies)
+	for (const auto &robot : currentConfig.enemies)
 	{
 		if (DEBUG)
 			cout << "Adding enemy robot with ID = " << robot.id << " as a obstacle" << endl;

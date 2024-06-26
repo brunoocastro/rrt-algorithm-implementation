@@ -15,9 +15,9 @@ const ftype EPS = 1e-6;
 
 bool DEBUG = false;
 
-int fieldWidth = 450;
-int fieldHeight = 450;
-int fieldRadius = 18;
+int fieldWidth = 4500;
+int fieldHeight = 3000;
+int fieldRadius = 180;
 
 struct Point
 {
@@ -211,6 +211,15 @@ public:
 
         return obstacle;
     }
+};
+
+class Configuration
+{
+public:
+    vector<Robot> team;
+    vector<Robot> enemies;
+    
+    Configuration(vector<Robot> team, vector<Robot> enemies, int fieldSizeX = 4500, int fieldSizeY = 3000) : team(team), enemies(enemies){};
 };
 
 /*  Returns a point in the direction of (p2 - p1) vector such that
