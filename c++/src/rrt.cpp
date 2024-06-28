@@ -10,7 +10,8 @@ using namespace std;
 const double GOAL_SAMPLING_PROB = 0.05;
 const double INF = 1e18;
 
-const double JUMP_SIZE = (fieldWidth / 100.0 * fieldHeight / 100.0) / 1.5;
+// const double JUMP_SIZE = (fieldWidth / 100.0 * fieldHeight / 100.0) / 1.5;
+const double JUMP_SIZE = 100;
 const double DISK_SIZE = JUMP_SIZE; // Ball radius around which nearby points are found
 
 int printEachIter = 50;
@@ -84,23 +85,26 @@ Configuration getConfig3()
 
 void getInput()
 {
-	
+
 	int currentRobotID = 0;
+
+	Configuration currentConfig = getConfig1();
 
 	fieldWidth = fieldWidth;
 	fieldHeight = fieldHeight;
 	fieldRadius = fieldRadius;
 
 	int pointsPadding = fieldRadius * 2;
+	cout << "Points padding: " << pointsPadding << endl;
 
-	Point start, stop;
 	start.x = pointsPadding;
-	start.y = pointsPadding;
+	start.y = fieldHeight / 2;
 
 	stop.x = fieldWidth - pointsPadding;
-	stop.y = fieldHeight - pointsPadding;
+	stop.y = fieldHeight / 2;
 
-	Configuration currentConfig = getConfig1();
+	cout << "Starting point: " << start.x << ", " << start.y << endl;
+	cout << "Ending point: " << stop.x << ", " << stop.y << endl;
 
 	for (const auto &robot : currentConfig.team)
 	{
@@ -158,14 +162,14 @@ void draw(sf::RenderWindow &window)
 	sf::CircleShape nodeCircle;
 
 	// Uncomment if circular nodes are to be drawn
-	/*
-	for(auto& node: nodes) {
-		nodeCircle.setRadius(RADIUS/2.5); // nodeCircle.setRadius(min(2.0, RADIUS/2.0));
-		nodeCircle.setOrigin(RADIUS/2.5, RADIUS/2.5);
-		nodeCircle.setFillColor(sf::Color(0, 255, 171)); nodeCircle.setPosition(node.x, node.y);
-		window.draw(nodeCircle);
-	}
-	*/
+	// for (auto &node : nodes)
+	// {
+	// 	nodeCircle.setRadius(fieldRadius / 2.5); // nodeCircle.setRadius(min(2.0, RADIUS/2.0));
+	// 	nodeCircle.setOrigin(fieldRadius / 2.5, fieldRadius / 2.5);
+	// 	nodeCircle.setFillColor(sf::Color(0, 255, 171));
+	// 	nodeCircle.setPosition(node.x, node.y);
+	// 	window.draw(nodeCircle);
+	// }
 
 	// Draw obstacles
 	for (auto &poly : drawablePolygons)
@@ -352,7 +356,15 @@ void RRT()
 
 int main()
 {
-
+	cout << "Configurações do RRT:" << endl
+			 << "Tamanho do campo:" << endl
+			 << "Largura: " << fieldWidth << endl
+			 << "Altura: " << fieldHeight << endl
+			 << "Raio do círculo: " << fieldRadius << endl
+			 << "Quantidade de obstáculos: " << obstacles.size() << endl
+			 << "Tamanho do passo:" << JUMP_SIZE << endl
+			 << "Raio do disco para procura do alvo:" << DISK_SIZE << endl
+			 << endl;
 	getInput();
 	drawInput();
 
@@ -367,6 +379,11 @@ int main()
 
 	cout << endl
 			 << "Starting node is in Pink and Destination node is in Blue" << endl
+			 << endl;
+
+	cout << endl
+			 << "Starting point: " << start.x << ", " << start.y << endl
+			 << "Ending point: " << stop.x << ", " << stop.y << endl
 			 << endl;
 
 	auto start = std::chrono::high_resolution_clock::now();
@@ -411,6 +428,7 @@ int main()
 				// Imprime a duração em segundos
 				std::chrono::duration<double> duration = end - start;
 				std::cout << "Tempo de execução: " << duration.count() << " segundos" << std::endl;
+				window.close();
 			}
 			cout << "Final path: " << endl;
 

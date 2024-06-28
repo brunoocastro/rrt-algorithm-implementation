@@ -13,7 +13,7 @@ using namespace std;
     since double/long double doesn't store floating point values precisely (limited precision) */
 const ftype EPS = 1e-6;
 
-bool DEBUG = false;
+bool DEBUG = true;
 
 int fieldWidth = 4500;
 int fieldHeight = 3000;
@@ -189,6 +189,7 @@ public:
     Robot(int id, double x, double y, double orientation) : id(id), x(x), y(y), orientation(orientation) {}
     Point getParsedPosition() const
     {
+        return Point(x, y); // TODO -> Validar se o desenho tá centralizado ou não.
         int parsedX = (int)(x + (fieldWidth / 2));
         int parsedY = (int)(y + (fieldHeight / 2));
         return Point(parsedX, parsedY);
