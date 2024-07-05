@@ -6,14 +6,14 @@ import math
 # Estrutura de dados fornecida
 configuracao1 = {
     "team_position": [
-        {"id": 0, "x": -2250.0, "y": 0.0, "z": 0.0, "orientation": 0.0},
+        {"id": 0, "x": -2050.0, "y": 0.0, "z": 0.0, "orientation": 0.0},
         {"id": 1, "x": -1000.0, "y": -750.0, "z": 0.0, "orientation": 0.0},
         {"id": 2, "x": -1000.0, "y": 750.0, "z": 0.0, "orientation": 0.0},
     ],
     "enemy_position": [
         {"id": 0, "x": 1000.0, "y": -750.0, "z": 0.0, "orientation": 0.0},
         {"id": 1, "x": 1000.0, "y": 750.0, "z": 0.0, "orientation": 0.0},
-        {"id": 2, "x": 2250.0, "y": 0.0, "z": 0.0, "orientation": 0.0},
+        {"id": 2, "x": 2050.0, "y": 0.0, "z": 0.0, "orientation": 0.0},
     ],
     "field_size": [4500.0, 3000.0],
     "goal_size": 800.0,
@@ -28,8 +28,8 @@ def visualize(config):
     field_width, field_height = config["field_size"]
     padding = 50  # Padding nas bordas
     screen_width, screen_height = (
-        900 + 2 * padding,
-        600 + 2 * padding,
+        450 + 2 * padding,
+        300 + 2 * padding,
     )  # Tamanho da tela com padding
     scale_x = (screen_width - 2 * padding) / field_width
     scale_y = (screen_height - 2 * padding) / field_height
@@ -55,7 +55,7 @@ def visualize(config):
             # Desenhar pontos da trajetória em verde
             x1 = padding + (trajectory[i][0] + field_width / 2) * scale_x
             y1 = padding + (field_height / 2 - trajectory[i][1]) * scale_y
-            pygame.draw.circle(screen, (0, 255, 0), (int(x1), int(y1)), 5)
+            pygame.draw.circle(screen, (0, 0, 255), (int(x1), int(y1)), 5)
 
             x2 = padding + (trajectory[i + 1][0] + field_width / 2) * scale_x
             y2 = padding + (field_height / 2 - trajectory[i + 1][1]) * scale_y
@@ -74,12 +74,12 @@ def visualize(config):
             pygame.draw.line(screen, white, (x2, y2), (arrow_x1, arrow_y1), 2)
             pygame.draw.line(screen, white, (x2, y2), (arrow_x2, arrow_y2), 2)
 
-        # Desenhar o último ponto da trajetória em verde
+        # Desenhar o último ponto da trajetória em vermelho
         x_last = padding + (trajectory[-1][0] + field_width / 2) * scale_x
         y_last = padding + (field_height / 2 - trajectory[-1][1]) * scale_y
-        pygame.draw.circle(screen, (0, 255, 0), (int(x_last), int(y_last)), 5)
+        pygame.draw.circle(screen, (255, 0, 0), (int(x_last), int(y_last)), 5)
 
-    def move_robot(robot, trajectory, gif_path):
+    def move_robot(robot, trajectory, target, gif_path):
         index = 0
         frames = []
         duration = 15  # Duração do GIF em segundos
@@ -125,6 +125,10 @@ def visualize(config):
                     goal_height,
                 ),
             )
+
+            target_x = padding + (target[0] + field_width / 2) * scale_x
+            target_y = padding + (field_height / 2 - target[1]) * scale_y
+            draw_robot(target_x, target_y, green)
 
             # Desenhar robôs do time
             for rob in config["team_position"]:
@@ -188,22 +192,47 @@ def visualize(config):
 
     # Inicializar o robô controlado e a trajetória
     robot = config["team_position"][0]
-    trajectory = [
-        (-2150, 0),
-        (-2000, 0),
-        (-1500, 250),
-        (-1000, 250),
-        (-500, 500),
-        (0, 500),
-        (500, 250),
-        (1000, 0),
-        (1500, 0),
-        (2000, -250),
-        (2200, -250),
+    data = [
+        {"x": -2050, "y": 0, "angle": -1.72749},
+        {"x": -1904.54, "y": 13.1763, "angle": 3.08738},
+        {"x": -1661.74, "y": 163.946, "angle": 2.31757},
+        {"x": -1522.19, "y": 298.825, "angle": 2.47087},
+        {"x": -1352.19, "y": 328.694, "angle": 2.97515},
+        {"x": -1174.4, "y": 396.115, "angle": 2.75301},
+        {"x": -1009.72, "y": 444.501, "angle": 2.67859},
+        {"x": -912.789, "y": 478.396, "angle": 3.01901},
+        {"x": -637.662, "y": 502.164, "angle": 3.0368},
+        {"x": -411.69, "y": 545.87, "angle": 2.80272},
+        {"x": -287.687, "y": 541.755, "angle": -3.1274},
+        {"x": 2.35145, "y": 592.799, "angle": 2.66558},
+        {"x": 101.358, "y": 595.155, "angle": 3.13324},
+        {"x": 383.37, "y": 643.122, "angle": 2.82563},
+        {"x": 530.097, "y": 691.199, "angle": 2.47614},
+        {"x": 591.352, "y": 443.15, "angle": -1.10609},
+        {"x": 467, "y": 427, "angle": -0.160117},
+        {"x": 367, "y": 249, "angle": -1.11554},
     ]
 
+    trajectory = [(entry["x"], entry["y"]) for entry in data]
+
+    # trajectory = [
+    #     (-2150, 0),
+    #     (-2000, 0),
+    #     (-1500, 250),
+    #     (-1000, 250),
+    #     (-500, 500),
+    #     (0, 500),
+    #     (500, 250),
+    #     (1000, 0),
+    #     (1500, 0),
+    #     (2000, -250),
+    #     (2200, -250),
+    # ]
+
+    target = (2250, 0)
+
     # Executar movimentação do robô ao longo da trajetória
-    move_robot(robot, trajectory, "trajectory.gif")
+    move_robot(robot, trajectory, target, "trajectory2.gif")
 
     pygame.quit()
     sys.exit()
