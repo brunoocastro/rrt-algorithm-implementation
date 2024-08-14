@@ -64,7 +64,6 @@ class TreeNode:
 
 
 class Map:
-
     drawnNodes = []
     figure = None
     figureAxes = None

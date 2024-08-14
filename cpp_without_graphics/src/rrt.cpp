@@ -30,6 +30,23 @@ vector<sf::ConvexShape> drawablePolygons;
 sf::CircleShape startingPoint, endingPoint;
 bool pathFound = 0;
 
+Configuration getConfig123()
+{
+	// ---------- Configuração 1 ------------
+	vector<Robot> team = {
+			Robot(0, -205, 0, 0.0),
+			Robot(1, -100, -75, 0.0),
+			Robot(2, -100, 75, 0.0),
+	};
+
+	vector<Robot> enemies = {
+			Robot(0, 205, 0, 0.0),
+			Robot(1, 100, 75, 0.0),
+			Robot(2, 1000, -75, 0.0),
+	};
+
+	return Configuration(team, enemies);
+}
 Configuration getConfig1()
 {
 	// ---------- Configuração 1 ------------
